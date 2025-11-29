@@ -45,14 +45,13 @@ func (idCfg *IdentityConfig) derivedAuthorizerConfig() error {
 	if idCfg.Init {
 		return nil // disabled
 	}
-	if idCfg.AuthorizerAddr == "" || idCfg.AuthorizationPolicyDomains == "" {
+	if idCfg.AuthorizationServerAddr == "" || idCfg.AuthorizationPolicyDomains == "" {
 		return nil // disabled
 	}
 
 	idCfg.Authorizer = DerivedAuthorizer{
 		Use:                                   true,
-		Addr:                                  idCfg.AuthorizerAddr,
-		Endpoint:                              idCfg.AuthorizerEndpoint,
+		Addr:                                  idCfg.AuthorizationServerAddr,
 		PolicyDomains:                         idCfg.AuthorizationPolicyDomains,
 		CacheInterval:                         idCfg.AuthorizationCacheInterval,
 		PolicyRefreshInterval:                 idCfg.PolicyRefreshInterval,

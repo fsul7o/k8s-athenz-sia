@@ -125,8 +125,7 @@ func DefaultIdentityConfig() *IdentityConfig {
 		shutdownDelay:                DEFAULT_SHUTDOWN_DELAY,
 
 		// Authorizer configuration
-		AuthorizerAddr:                        "",
-		AuthorizerEndpoint:                    "/authorize",
+		AuthorizationServerAddr:               "",
 		AuthorizationPolicyDomains:            "",
 		AuthorizationCacheInterval:            5 * time.Minute,
 		PolicyRefreshInterval:                 30 * time.Minute,

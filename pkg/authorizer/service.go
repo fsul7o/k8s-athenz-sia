@@ -135,16 +135,13 @@ func New(ctx context.Context, idCfg *config.IdentityConfig) (daemon.Daemon, erro
 	}
 	as.authorizerDaemon = authzDaemon
 
-	// Setup HTTP handler
-	mux := http.NewServeMux()
-	mux.HandleFunc(idCfg.Authorizer.Endpoint, as.handleAuthorizerRequest)
 	as.authorizerServer = &http.Server{
 		Addr:    idCfg.Authorizer.Addr,
-		Handler: mux,
+		Handler: http.HandlerFunc(as.handleAuthorizerRequest),
 	}
 
-	log.Infof("Initialized authorizer: address[%s], endpoint[%s], domains[%s]",
-		idCfg.Authorizer.Addr, idCfg.Authorizer.Endpoint, idCfg.Authorizer.PolicyDomains)
+	log.Infof("Initialized authorizer: address[%s], domains[%s]",
+		idCfg.Authorizer.Addr, idCfg.Authorizer.PolicyDomains)
 
 	return as, nil
 }

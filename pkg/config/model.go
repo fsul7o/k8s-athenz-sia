@@ -88,8 +88,7 @@ type IdentityConfig struct {
 
 	// Authorizer Derived State and its related fields:
 	Authorizer                            DerivedAuthorizer
-	AuthorizerAddr                        string
-	AuthorizerEndpoint                    string
+	AuthorizationServerAddr               string
 	AuthorizationPolicyDomains            string
 	AuthorizationCacheInterval            time.Duration
 	PolicyRefreshInterval                 time.Duration
