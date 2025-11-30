@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  version: 0.0.1
+  title: Athenz Authorizer API
+  description: |
+    Authorization service that validates Athenz credentials (access tokens, role tokens, or role certificates)
+    and checks if the principal has permission to perform a specific action on a resource.
+  contact:
+    email: "cncf-athenz-maintainers@lists.cncf.io"
+    name: Athenz
+    url: https://www.athenz.io/contact.html
+  license:
+    name: Apache 2.0
+    identifier: Apache-2.0
+servers:
+  - description: Authorizer server (localhost)
+    url: http://localhost:8180
+paths:
+  /:
+    get:
+      summary: Authorize access to a resource
+      operationId: Authorize
+      description: |
+        Validates Athenz credentials and authorizes access to a specified resource.
+        Accepts access tokens, role tokens, or role certificates for authentication.
+        Returns principal information if authorization succeeds.
+        
+        **Proxy-friendly**: This endpoint accepts requests with any HTTP method and path.
+        The client's original HTTP method and path are forwarded as-is to the upstream service.
+        The authorizer validates the credentials and adds principal information to the request headers.
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Bearer access token for OAuth-based authorization
+          example: Bearer eyJraWQiOiIwIiwidHlwIjoiYXQrand0IiwiYWxnIjoiUlMyNTYifQ...
+        - name: Athenz-Role-Auth
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Role token for role-based authorization (header name is configurable)
+          example: v=Z1;d=domain.shopping;r=users;p=domain.travel.travel-site...
+        - name: X-Athenz-Certificate
+          in: header
+          required: false
+          schema:
+            type: string
+          description: URL-encoded PEM format role certificate for certificate-based authorization
+          example: "-----BEGIN%20CERTIFICATE-----%0A...%0A-----END%20CERTIFICATE-----"
+        - name: X-Athenz-Action
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: The action to be authorized (e.g., read, write, delete)
+          example: read
+        - name: X-Athenz-Resource
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: The resource to be accessed in Athenz format (domain:resource)
+          example: domain.shopping:resource.item
+      responses:
+        "200":
+          $ref: '#/components/responses/AuthorizeSuccess'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+components:
+  responses:
+    AuthorizeSuccess:
+      description: Authorization successful
+      headers:
+        X-Athenz-Principal:
+          description: Full principal name
+          schema:
+            type: string
+          example: domain.travel.travel-site
+        X-Athenz-Domain:
+          description: Domain of the principal
+          schema:
+            type: string
+          example: domain.travel
+        X-Athenz-Role:
+          description: Comma-separated list of roles
+          schema:
+            type: string
+          example: admin,users
+        X-Athenz-Issued-At:
+          description: Token issue time (Unix timestamp in seconds)
+          schema:
+            type: integer
+          example: 1583714704
+        X-Athenz-Expires-At:
+          description: Token expiry time (Unix timestamp in seconds)
+          schema:
+            type: integer
+          example: 1583716504
+        X-Athenz-AuthorizedRoles:
+          description: Comma-separated list of roles that authorized this request
+          schema:
+            type: string
+          example: users
+        X-Athenz-Client-ID:
+          description: OAuth client ID (only present for access token authentication)
+          schema:
+            type: string
+          example: domain.travel.travel-site
+        Content-Type:
+          description: Response content type
+          schema:
+            type: string
+          example: application/json; charset=utf-8
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthorizeResponse'
+          examples:
+            accessToken:
+              summary: Authorization with access token
+              value:
+                principal: domain.travel.travel-site
+                domain: domain.travel
+                role: admin,users
+                issued-at: "1583714704"
+                expires-at: "1583716504"
+                authorizedroles: users
+            roleToken:
+              summary: Authorization with role token
+              value:
+                principal: domain.travel.travel-site
+                domain: domain.travel
+                role: users
+                issued-at: "1528853625"
+                expires-at: "1528860825"
+                authorizedroles: users
+    BadRequest:
+      description: Bad Request (missing required headers, malformed certificate, or invalid request parameters)
+      content:
+        "*/*":
+          examples:
+            missingHeaders:
+              summary: Missing required headers
+              value: ""
+            malformedCertificate:
+              summary: Malformed PEM or X.509 certificate
+              value: ""
+    Unauthorized:
+      description: Unauthorized (authentication failed or principal does not have permission)
+      content:
+        "*/*":
+          examples:
+            authenticationFailed:
+              summary: Invalid credentials or authorization failed
+              value: ""
+    InternalServerError:
+      description: Internal Server Error (error while processing authorization or preparing response)
+      content:
+        "*/*":
+          examples:
+            sample:
+              value: ""
+  schemas:
+    AuthorizeResponse:
+      type: object
+      required:
+        - principal
+        - domain
+        - role
+        - issued-at
+        - expires-at
+        - authorizedroles
+      properties:
+        principal:
+          description: Full principal name
+          type: string
+          example: domain.travel.travel-site
+        domain:
+          description: Domain of the principal
+          type: string
+          example: domain.travel
+        role:
+          description: Comma-separated list of roles
+          type: string
+          example: admin,users
+        issued-at:
+          description: Token issue time (Unix timestamp in seconds as string)
+          type: string
+          example: "1583714704"
+        expires-at:
+          description: Token expiry time (Unix timestamp in seconds as string)
+          type: string
+          example: "1583716504"
+        authorizedroles:
+          description: Comma-separated list of roles that authorized this request
+          type: string
+          example: users

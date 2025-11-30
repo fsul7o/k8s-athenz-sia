@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   version: 0.0.1
   title: Athenz client sidecar API
+  description: |
+    API for Athenz SIA (Service Identity Agent) token provisioning.
+    Provides access tokens and role tokens via REST API or HTTP headers.
   contact:
     email: "cncf-athenz-maintainers@lists.cncf.io"
     name: Athenz
@@ -10,9 +13,60 @@ info:
     name: Apache 2.0
     identifier: Apache-2.0
 servers:
-  - description: localhost
+  - description: Token server (localhost)
     url: http://localhost:8080
 paths:
+  /:
+    get:
+      summary: Fetch cached tokens via HTTP headers (Header Token Mode)
+      operationId: FetchTokensViaHeaders
+      description: |
+        This endpoint is for Header Token Mode on the Token Server. It receives token request parameters via HTTP headers
+        and returns cached access tokens and/or role tokens in response headers and body.
+        This mode must be explicitly enabled via configuration.
+        
+        **Proxy-friendly**: This endpoint accepts requests with any HTTP method and path.
+        The client's original HTTP method and path are forwarded as-is to the upstream service,
+        while SIA adds the authentication tokens to the request.
+      parameters:
+        - name: X-Athenz-Domain
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: Athenz domain name
+          example: domain.shopping
+        - name: X-Athenz-Role
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: Athenz role name
+          example: users
+        - name: X-Athenz-Expiry
+          in: header
+          required: false
+          schema:
+            type: integer
+          description: Token expiry time in seconds
+          example: 1800
+        - name: X-Athenz-Proxy-For-Principal
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Proxy for principal name
+      responses:
+        "200":
+          $ref: '#/components/responses/HeaderTokenResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
   /accesstoken:
     post:
       summary: Fetch cached access token
@@ -22,6 +76,8 @@ paths:
       responses:
         "200":
           $ref: '#/components/responses/atResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
         "500":
           $ref: '#/components/responses/InternalServerError'
   /roletoken:
@@ -33,45 +89,67 @@ paths:
       responses:
         "200":
           $ref: '#/components/responses/rtResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
         "500":
           $ref: '#/components/responses/InternalServerError'
 components:
-  requestBodies:
-    atRequestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/AccessTokenRequestBody'
-          examples:
-            sample:
-              value:
-                domain: domain.shopping
-                role: users
-                proxy_for_principal: ""
-                expiry: 1800
-    rtRequestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/RoleTokenRequestBody'
-          examples:
-            sample:
-              value:
-                domain: domain.shopping
-                role: users
-                proxy_for_principal: ""
-                min_expiry: 7200
-                max_expiry: 10000
   responses:
-    # MethodNotAllowed:
-    #   description: Method Not Allowed
-    #   content:
-    #     "*/*":
-    #       examples:
-    #         sample:
-    #           value: Method Not Allowed
+    HeaderTokenResponse:
+      description: Header token response with tokens in both headers and body
+      headers:
+        Authorization:
+          description: Bearer access token (only if access token is available)
+          schema:
+            type: string
+          example: bearer eyJraWQiOiIwIiwidHlwIjoiYXQrand0IiwiYWxnIjoiUlMyNTYifQ...
+        Athenz-Role-Auth:
+          description: Role token (header name is configurable, only if role token is available)
+          schema:
+            type: string
+          example: v=Z1;d=domain.shopping;r=users;p=domain.travel.travel-site...
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              accesstoken:
+                type: string
+                description: Access token string (only if access token is available)
+              roletoken:
+                type: string
+                description: Role token string (only if role token is available)
+          examples:
+            withBothTokens:
+              summary: Response with both access token and role token
+              value:
+                accesstoken: eyJraWQiOiIwIiwidHlwIjoiYXQrand0IiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiJkb21haW4udHJhdmVsLnRyYXZlbC1zaXRlIiwiaWF0IjoxNTgzNzE0NzA0LCJleHAiOjE1ODM3MTY1MDQsImlzcyI6Imh0dHBzOi8venRzLmF0aGVuei5pbyIsImF1ZCI6ImRvbWFpbi5zaG9wcGluZyIsImF1dGhfdGltZSI6MTU4MzcxNDcwNCwidmVyIjoxLCJzY3AiOlsidXNlcnMiXSwidWlkIjoiZG9tYWluLnRyYXZlbC50cmF2ZWwtc2l0ZSIsImNsaWVudF9pZCI6ImRvbWFpbi50cmF2ZWwudHJhdmVsLXNpdGUifQ.<signature>
+                roletoken: v=Z1;d=domain.shopping;r=users;p=domain.travel.travel-site;h=athenz.co.jp;a=9109ee08b79e6b63;t=1528853625;e=1528860825;k=0;i=192.168.1.1;s=<signature>
+            withAccessTokenOnly:
+              summary: Response with access token only
+              value:
+                accesstoken: eyJraWQiOiIwIiwidHlwIjoiYXQrand0IiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiJkb21haW4udHJhdmVsLnRyYXZlbC1zaXRlIiwiaWF0IjoxNTgzNzE0NzA0LCJleHAiOjE1ODM3MTY1MDQsImlzcyI6Imh0dHBzOi8venRzLmF0aGVuei5pbyIsImF1ZCI6ImRvbWFpbi5zaG9wcGluZyIsImF1dGhfdGltZSI6MTU4MzcxNDcwNCwidmVyIjoxLCJzY3AiOlsidXNlcnMiXSwidWlkIjoiZG9tYWluLnRyYXZlbC50cmF2ZWwtc2l0ZSIsImNsaWVudF9pZCI6ImRvbWFpbi50cmF2ZWwudHJhdmVsLXNpdGUifQ.<signature>
+    NotFound:
+      description: Not Found (endpoint not found or Header Token Mode is not enabled)
+      content:
+        "*/*":
+          examples:
+            sample:
+              value: "404 page not found"
+    BadRequest:
+      description: Bad Request (includes invalid JSON format, validation errors such as empty domain, unknown fields, or invalid parameter values)
+      content:
+        "*/*":
+          examples:
+            invalidJson:
+              summary: Invalid JSON format
+              value: "Error: invalid character '}' looking for beginning of value requestID[xxx]\tInternal Server Error"
+            missingDomain:
+              summary: Missing required domain field
+              value: "Error: Client error: Invalid value: domain[], role[] requestID[xxx]\tInternal Server Error"
+            unknownField:
+              summary: Unknown field in request body
+              value: "Error: Client error: json: unknown field \"unknown_field\" requestID[xxx]\tInternal Server Error"
     InternalServerError:
       description: Internal Server Error (includes token not found, errors in requesting Athenz ZTS server, and other internal errors)
       content:
@@ -103,6 +181,34 @@ components:
               value:
                 expiryTime: 1528860825
                 token: v=Z1;d=domain.shopping;r=users;p=domain.travel.travel-site;h=athenz.co.jp;a=9109ee08b79e6b63;t=1528853625;e=1528860825;k=0;i=192.168.1.1;s=<signature>
+  requestBodies:
+    atRequestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessTokenRequestBody'
+          examples:
+            sample:
+              value:
+                domain: domain.shopping
+                role: users
+                proxy_for_principal: ""
+                expiry: 1800
+    rtRequestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RoleTokenRequestBody'
+          examples:
+            sample:
+              value:
+                domain: domain.shopping
+                role: users
+                proxy_for_principal: ""
+                min_expiry: 7200
+                max_expiry: 10000
   schemas:
     AccessTokenRequestBody:
       type: object
@@ -177,3 +283,4 @@ components:
           description: Role token expiry time (Unix timestamp in second)
           type: integer
           x-go-type: int64
+
