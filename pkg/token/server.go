@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/AthenZ/k8s-athenz-sia/v3/third_party/log"
@@ -29,8 +30,10 @@ import (
 )
 
 const (
-	DOMAIN_HEADER = "X-Athenz-Domain"
-	ROLE_HEADER   = "X-Athenz-Role"
+	DOMAIN_HEADER              = "X-Athenz-Domain"
+	ROLE_HEADER                = "X-Athenz-Role"
+	EXPIRY_HEADER              = "X-Athenz-Expiry"
+	PROXY_FOR_PRINCIPAL_HEADER = "X-Athenz-Proxy-For-Principal"
 )
 
 var (
@@ -251,6 +254,17 @@ func newHandlerFunc(ts *tokenService, timeout time.Duration) http.Handler {
 		// Logic for the token server that attaches tokens to response headers begins here:
 		domain := r.Header.Get(DOMAIN_HEADER)
 		role := r.Header.Get(ROLE_HEADER)
+		rawExpiry := r.Header.Get(EXPIRY_HEADER)
+		var expiry int
+		if rawExpiry != "" {
+			var err error
+			expiry, err = strconv.Atoi(rawExpiry)
+			if err != nil {
+				err = fmt.Errorf("%w: Invalid value: %s[%s]", ClientError, EXPIRY_HEADER, rawExpiry)
+				return
+			}
+		}
+		proxyForPrincipal := r.Header.Get(PROXY_FOR_PRINCIPAL_HEADER)
 
 		var errMsg = ""
 		var aToken, rToken Token
@@ -259,19 +273,37 @@ func newHandlerFunc(ts *tokenService, timeout time.Duration) http.Handler {
 		} else {
 			// TODO: Since the specifications are not yet decided, the value of WriteFileRequired is undetermined.
 			// TODO: Maybe we need to separate the cache keys for RT and AT?
-			// TODO: ここなんかおかしい
 			if ts.tokenType&mACCESS_TOKEN != 0 {
-				k := CacheKey{Domain: domain, Role: role, MaxExpiry: ts.tokenExpiryInSecond}
+				k := CacheKey{Domain: domain, Role: role}
+				if proxyForPrincipal != "" {
+					k.ProxyForPrincipal = proxyForPrincipal
+				}
+				if rawExpiry != "" && expiry > 0 {
+					k.MaxExpiry = expiry
+				}
+				if k.MaxExpiry == 0 && ts.tokenExpiryInSecond > 0 {
+					k.MaxExpiry = ts.tokenExpiryInSecond
+				}
+
 				k, aToken = ts.accessTokenCache.Search(k)
 				if aToken == nil {
-					errMsg = fmt.Sprintf("domain[%s] role[%s] MaxExpiry[%d] ProxyForPrincipal[%s] was not found in accesstoken cache.", k.Domain, k.Role, k.MaxExpiry, k.ProxyForPrincipal)
+					errMsg = fmt.Sprintf("domain[%s] role[%s] was not found in cache.", domain, role)
 				}
 			}
 			if ts.tokenType&mROLE_TOKEN != 0 {
-				k := CacheKey{Domain: domain, Role: role, MinExpiry: ts.tokenExpiryInSecond}
+				k := CacheKey{Domain: domain, Role: role}
+				if proxyForPrincipal != "" {
+					k.ProxyForPrincipal = proxyForPrincipal
+				}
+				if rawExpiry != "" && expiry > 0 {
+					k.MaxExpiry = expiry
+				}
+				if k.MinExpiry == 0 && ts.tokenExpiryInSecond > 0 {
+					k.MinExpiry = ts.tokenExpiryInSecond
+				}
 				k, rToken = ts.roleTokenCache.Search(k)
 				if rToken == nil {
-					errMsg = fmt.Sprintf("domain[%s] role[%s] MinExpiry[%d] ProxyForPrincipal[%s] was not found in roletoken cache.", k.Domain, k.Role, k.MinExpiry, k.ProxyForPrincipal)
+					errMsg = fmt.Sprintf("domain[%s] role[%s] was not found in cache.", domain, role)
 				}
 			}
 		}
