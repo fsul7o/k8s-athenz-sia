@@ -264,14 +264,14 @@ func newHandlerFunc(ts *tokenService, timeout time.Duration) http.Handler {
 				k := CacheKey{Domain: domain, Role: role, MaxExpiry: ts.tokenExpiryInSecond}
 				k, aToken = ts.accessTokenCache.Search(k)
 				if aToken == nil {
-					errMsg = fmt.Sprintf("domain[%s] role[%s] was not found in cache.", domain, role)
+					errMsg = fmt.Sprintf("domain[%s] role[%s] MaxExpiry[%d] ProxyForPrincipal[%s] was not found in accesstoken cache.", k.Domain, k.Role, k.MaxExpiry, k.ProxyForPrincipal)
 				}
 			}
 			if ts.tokenType&mROLE_TOKEN != 0 {
 				k := CacheKey{Domain: domain, Role: role, MinExpiry: ts.tokenExpiryInSecond}
 				k, rToken = ts.roleTokenCache.Search(k)
 				if rToken == nil {
-					errMsg = fmt.Sprintf("domain[%s] role[%s] was not found in cache.", domain, role)
+					errMsg = fmt.Sprintf("domain[%s] role[%s] MinExpiry[%d] ProxyForPrincipal[%s] was not found in roletoken cache.", k.Domain, k.Role, k.MinExpiry, k.ProxyForPrincipal)
 				}
 			}
 		}
