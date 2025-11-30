@@ -259,16 +259,16 @@ func newHandlerFunc(ts *tokenService, timeout time.Duration) http.Handler {
 		} else {
 			// TODO: Since the specifications are not yet decided, the value of WriteFileRequired is undetermined.
 			// TODO: Maybe we need to separate the cache keys for RT and AT?
-			// TODO: minexpiryで検索する必要ある？？？
-			// k := CacheKey{Domain: domain, Role: role, MinExpiry: ts.tokenExpiryInSecond}
-			k := CacheKey{Domain: domain, Role: role}
+			// TODO: ここなんかおかしい
 			if ts.tokenType&mACCESS_TOKEN != 0 {
+				k := CacheKey{Domain: domain, Role: role, MaxExpiry: ts.tokenExpiryInSecond}
 				k, aToken = ts.accessTokenCache.Search(k)
 				if aToken == nil {
 					errMsg = fmt.Sprintf("domain[%s] role[%s] was not found in cache.", domain, role)
 				}
 			}
 			if ts.tokenType&mROLE_TOKEN != 0 {
+				k := CacheKey{Domain: domain, Role: role, MinExpiry: ts.tokenExpiryInSecond}
 				k, rToken = ts.roleTokenCache.Search(k)
 				if rToken == nil {
 					errMsg = fmt.Sprintf("domain[%s] role[%s] was not found in cache.", domain, role)
