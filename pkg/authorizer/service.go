@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -273,33 +272,13 @@ func (as *authorizerService) handleAuthorizerRequest(w http.ResponseWriter, r *h
 	w.Header().Set("X-Athenz-Role", strings.Join(principal.Roles(), ","))
 	w.Header().Set("X-Athenz-Issued-At", fmt.Sprintf("%d", principal.IssueTime()))
 	w.Header().Set("X-Athenz-Expires-At", fmt.Sprintf("%d", principal.ExpiryTime()))
-	w.Header().Set("X-Athenz-AuthorizedRoles", strings.Join(principal.AuthorizedRoles(), ","))
+	w.Header().Set("X-Athenz-AuthorizedRole", strings.Join(principal.AuthorizedRoles(), ","))
 
 	if c, ok := principal.(authorizerd.OAuthAccessToken); ok {
 		w.Header().Set("X-Athenz-Client-ID", c.ClientID())
 	}
 
-	// Prepare JSON response
-	result := map[string]string{
-		"principal":       principal.Name(),
-		"domain":          principal.Domain(),
-		"role":            strings.Join(principal.Roles(), ","),
-		"issued-at":       fmt.Sprintf("%d", principal.IssueTime()),
-		"expires-at":      fmt.Sprintf("%d", principal.ExpiryTime()),
-		"authorizedroles": strings.Join(principal.AuthorizedRoles(), ","),
-	}
-
-	response, err := json.Marshal(result)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Infof("Authorization succeeded with Authorization len(%d), %s len(%d), X-Athenz-Certificate len(%d), action[%s], resource[%s] but failed to prepare response: %s",
-			len(at), as.idCfg.Authorizer.RoleAuthHeader, len(rt), len(certificatePEM), action, resource, err.Error())
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(response)
 
 	log.Debugf("successfully authorized request with Authorization len(%d), %s len(%d), X-Athenz-Certificate len(%d), action[%s], resource[%s]", len(at), as.idCfg.Authorizer.RoleAuthHeader, len(rt), len(certificatePEM), action, resource)
 }

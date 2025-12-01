@@ -166,9 +166,9 @@ components:
           examples:
             sample:
               value:
-                access_token: eyJraWQiOiIwIiwidHlwIjoiYXQrand0IiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiJkb21haW4udHJhdmVsLnRyYXZlbC1zaXRlIiwiaWF0IjoxNTgzNzE0NzA0LCJleHAiOjE1ODM3MTY1MDQsImlzcyI6Imh0dHBzOi8venRzLmF0aGVuei5pbyIsImF1ZCI6ImRvbWFpbi5zaG9wcGluZyIsImF1dGhfdGltZSI6MTU4MzcxNDcwNCwidmVyIjoxLCJzY3AiOlsidXNlcnMiXSwidWlkIjoiZG9tYWluLnRyYXZlbC50cmF2ZWwtc2l0ZSIsImNsaWVudF9pZCI6ImRvbWFpbi50cmF2ZWwudHJhdmVsLXNpdGUifQ.<signature>
-                token_type: Bearer
-                expires_in: 1800
+                accessToken: eyJraWQiOiIwIiwidHlwIjoiYXQrand0IiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiJkb21haW4udHJhdmVsLnRyYXZlbC1zaXRlIiwiaWF0IjoxNTgzNzE0NzA0LCJleHAiOjE1ODM3MTY1MDQsImlzcyI6Imh0dHBzOi8venRzLmF0aGVuei5pbyIsImF1ZCI6ImRvbWFpbi5zaG9wcGluZyIsImF1dGhfdGltZSI6MTU4MzcxNDcwNCwidmVyIjoxLCJzY3AiOlsidXNlcnMiXSwidWlkIjoiZG9tYWluLnRyYXZlbC50cmF2ZWwtc2l0ZSIsImNsaWVudF9pZCI6ImRvbWFpbi50cmF2ZWwudHJhdmVsLXNpdGUifQ.<signature>
+                tokenType: Bearer
+                expiresIn: 1800
                 scope: domain.shopping:role.users
     rtResponse:
       description: role token response
@@ -232,17 +232,17 @@ components:
     AccessTokenResponse:
       type: object
       required:
-        - access_token
-        - token_type
-        - expires_in
+        - accessToken
+        - tokenType
+        - expiresIn
       properties:
-        access_token:
+        accessToken:
           description: Access token string
           type: string
-        token_type:
+        tokenType:
           description: Access token token type
           type: string
-        expires_in:
+        expiresIn:
           description: Access token expiry time (in second)
           type: integer
         scope:

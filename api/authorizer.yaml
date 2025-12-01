@@ -105,7 +105,7 @@ components:
           schema:
             type: integer
           example: 1583716504
-        X-Athenz-AuthorizedRoles:
+        X-Athenz-AuthorizedRole:
           description: Comma-separated list of roles that authorized this request
           schema:
             type: string
@@ -115,52 +115,20 @@ components:
           schema:
             type: string
           example: domain.travel.travel-site
-        Content-Type:
-          description: Response content type
-          schema:
-            type: string
-          example: application/json; charset=utf-8
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/AuthorizeResponse'
-          examples:
-            accessToken:
-              summary: Authorization with access token
-              value:
-                principal: domain.travel.travel-site
-                domain: domain.travel
-                role: admin,users
-                issued-at: "1583714704"
-                expires-at: "1583716504"
-                authorizedroles: users
-            roleToken:
-              summary: Authorization with role token
-              value:
-                principal: domain.travel.travel-site
-                domain: domain.travel
-                role: users
-                issued-at: "1528853625"
-                expires-at: "1528860825"
-                authorizedroles: users
+
     BadRequest:
       description: Bad Request (missing required headers, malformed certificate, or invalid request parameters)
       content:
         "*/*":
           examples:
-            missingHeaders:
-              summary: Missing required headers
-              value: ""
-            malformedCertificate:
-              summary: Malformed PEM or X.509 certificate
+            sample:
               value: ""
     Unauthorized:
       description: Unauthorized (authentication failed or principal does not have permission)
       content:
         "*/*":
           examples:
-            authenticationFailed:
-              summary: Invalid credentials or authorization failed
+            sample:
               value: ""
     InternalServerError:
       description: Internal Server Error (error while processing authorization or preparing response)
@@ -169,38 +137,3 @@ components:
           examples:
             sample:
               value: ""
-  schemas:
-    AuthorizeResponse:
-      type: object
-      required:
-        - principal
-        - domain
-        - role
-        - issued-at
-        - expires-at
-        - authorizedroles
-      properties:
-        principal:
-          description: Full principal name
-          type: string
-          example: domain.travel.travel-site
-        domain:
-          description: Domain of the principal
-          type: string
-          example: domain.travel
-        role:
-          description: Comma-separated list of roles
-          type: string
-          example: admin,users
-        issued-at:
-          description: Token issue time (Unix timestamp in seconds as string)
-          type: string
-          example: "1583714704"
-        expires-at:
-          description: Token expiry time (Unix timestamp in seconds as string)
-          type: string
-          example: "1583716504"
-        authorizedroles:
-          description: Comma-separated list of roles that authorized this request
-          type: string
-          example: users
