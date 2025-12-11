@@ -179,10 +179,23 @@ func (ts *tokenService) Start(ctx context.Context) error {
 			defer ts.shutdownWg.Done()
 
 			listenAndServe := func() error {
-				if ts.tokenServer.TLSConfig != nil {
-					return ts.tokenServer.ListenAndServeTLS("", "")
+				if ts.idCfg.EnableReusePort {
+					// Create listener with SO_REUSEPORT for graceful updates
+					listener, err := extutil.ListenWithReusePort("tcp", ts.tokenServer.Addr)
+					if err != nil {
+						return err
+					}
+					if ts.tokenServer.TLSConfig != nil {
+						return ts.tokenServer.ServeTLS(listener, "", "")
+					}
+					return ts.tokenServer.Serve(listener)
+				} else {
+					// Use standard ListenAndServe
+					if ts.tokenServer.TLSConfig != nil {
+						return ts.tokenServer.ListenAndServeTLS("", "")
+					}
+					return ts.tokenServer.ListenAndServe()
 				}
-				return ts.tokenServer.ListenAndServe()
 			}
 			if err := listenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("Failed to start token provider server: %s", err.Error())

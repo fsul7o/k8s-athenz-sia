@@ -32,6 +32,7 @@ import (
 	"github.com/AthenZ/k8s-athenz-sia/v3/pkg/certificate"
 	"github.com/AthenZ/k8s-athenz-sia/v3/pkg/config"
 	"github.com/AthenZ/k8s-athenz-sia/v3/pkg/daemon"
+	extutil "github.com/AthenZ/k8s-athenz-sia/v3/pkg/util"
 	"github.com/AthenZ/k8s-athenz-sia/v3/third_party/log"
 )
 
@@ -179,7 +180,19 @@ func (as *authorizerService) Start(ctx context.Context) error {
 		defer as.shutdownWg.Done()
 		log.Infof("Starting authorizer server[%s]", as.idCfg.Authorizer.Addr)
 
-		if err := as.authorizerServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if as.idCfg.EnableReusePort {
+			// Create listener with SO_REUSEPORT for graceful updates
+			listener, listenerErr := extutil.ListenWithReusePort("tcp", as.authorizerServer.Addr)
+			if listenerErr != nil {
+				log.Fatalf("Failed to create listener for authorizer server: %s", listenerErr.Error())
+			}
+			err = as.authorizerServer.Serve(listener)
+		} else {
+			// Use standard ListenAndServe
+			err = as.authorizerServer.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start authorizer server: %s", err.Error())
 		}
 		log.Info("Stopped authorizer server")

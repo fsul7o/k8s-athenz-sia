@@ -23,6 +23,7 @@ import (
 
 	"github.com/AthenZ/k8s-athenz-sia/v3/pkg/config"
 	"github.com/AthenZ/k8s-athenz-sia/v3/pkg/daemon"
+	extutil "github.com/AthenZ/k8s-athenz-sia/v3/pkg/util"
 	"github.com/AthenZ/k8s-athenz-sia/v3/third_party/log"
 )
 
@@ -78,7 +79,19 @@ func (hs *hcService) Start(ctx context.Context) error {
 		hs.shutdownWg.Add(1)
 		go func() {
 			defer hs.shutdownWg.Done()
-			if err := hs.hcServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			var err error
+			if hs.idCfg.EnableReusePort {
+				// Create listener with SO_REUSEPORT for graceful updates
+				listener, listenerErr := extutil.ListenWithReusePort("tcp", hs.hcServer.Addr)
+				if listenerErr != nil {
+					log.Fatalf("Failed to create listener for health check server: %s", listenerErr.Error())
+				}
+				err = hs.hcServer.Serve(listener)
+			} else {
+				// Use standard ListenAndServe
+				err = hs.hcServer.ListenAndServe()
+			}
+			if err != nil && err != http.ErrServerClosed {
 				log.Fatalf("Failed to start health check server: %s", err.Error())
 			}
 			log.Info("Stopped health check server")

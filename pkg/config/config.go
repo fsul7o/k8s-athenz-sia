@@ -125,6 +125,8 @@ func (idCfg *IdentityConfig) loadFromENV() error {
 	loadEnv("HEALTH_CHECK_ADDR", &idCfg.HealthCheckAddr)
 	loadEnv("HEALTH_CHECK_ENDPOINT", &idCfg.HealthCheckEndpoint)
 
+	loadEnv("ENABLE_REUSEPORT", &idCfg.rawEnableReusePort)
+
 	loadEnv("AUTHORIZATION_SERVER_ADDR", &idCfg.AuthorizationServerAddr)
 	loadEnv("AUTHORIZATION_POLICY_DOMAINS", &idCfg.AuthorizationPolicyDomains)
 	loadEnv("AUTHORIZATION_CACHE_INTERVAL", &idCfg.rawAuthorizationCacheInterval)
@@ -203,6 +205,12 @@ func (idCfg *IdentityConfig) loadFromENV() error {
 	if err != nil {
 		return fmt.Errorf("Invalid ENABLE_MTLS_CERTIFICATE_BOUND_ACCESS_TOKEN [%q], %w", idCfg.rawEnableMTLSCertificateBoundAccessToken, err)
 	}
+	if idCfg.rawEnableReusePort != "" {
+		idCfg.EnableReusePort, err = strconv.ParseBool(idCfg.rawEnableReusePort)
+		if err != nil {
+			return fmt.Errorf("Invalid ENABLE_REUSEPORT [%q], %w", idCfg.rawEnableReusePort, err)
+		}
+	}
 	return nil
 }
 
@@ -263,6 +271,8 @@ func (idCfg *IdentityConfig) loadFromFlag(program string, args []string) error {
 	// healthCheck
 	f.StringVar(&idCfg.HealthCheckAddr, "health-check-addr", idCfg.HealthCheckAddr, "HTTP server address to provide health check")
 	f.StringVar(&idCfg.HealthCheckEndpoint, "health-check-endpoint", idCfg.HealthCheckEndpoint, "HTTP server endpoint to provide health check")
+	// network options
+	f.BoolVar(&idCfg.EnableReusePort, "enable-reuseport", idCfg.EnableReusePort, "enable SO_REUSEPORT for HTTP servers (true/false)")
 	// authorizer
 	f.StringVar(&idCfg.AuthorizationServerAddr, "authorization-server-addr", idCfg.AuthorizationServerAddr, "HTTP server address to provide authorization service")
 	f.StringVar(&idCfg.AuthorizationPolicyDomains, "authorization-policy-domains", idCfg.AuthorizationPolicyDomains, "Athenz policy domains for authorization (comma-separated)")
