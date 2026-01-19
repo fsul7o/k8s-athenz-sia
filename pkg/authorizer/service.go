@@ -43,7 +43,6 @@ type authorizerService struct {
 	authorizerServer        *http.Server
 	authorizerServerRunning bool
 	authorizerDaemon        authorizerd.Authorizerd
-	httpClient              *http.Client
 
 	daemonCtx    context.Context
 	daemonCancel context.CancelFunc
@@ -90,10 +89,8 @@ func New(ctx context.Context, idCfg *config.IdentityConfig) (daemon.Daemon, erro
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	if !idCfg.Init {
-		tlsConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			return idCfg.Reloader.GetLatestCertificate()
-		}
+	tlsConfig.GetClientCertificate = func(_ *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		return idCfg.Reloader.GetLatestCertificate()
 	}
 	if idCfg.ServerCACert != "" {
 		certPool := x509.NewCertPool()
@@ -112,7 +109,6 @@ func New(ctx context.Context, idCfg *config.IdentityConfig) (daemon.Daemon, erro
 		Transport: t,
 		Timeout:   30 * time.Second,
 	}
-	as.httpClient = authorizerClient
 
 	// Initialize athenz-authorizer daemon
 	authzDaemon, err := authorizerd.New(
@@ -136,6 +132,11 @@ func New(ctx context.Context, idCfg *config.IdentityConfig) (daemon.Daemon, erro
 		return nil, err
 	}
 	as.authorizerDaemon = authzDaemon
+
+	if err := as.authorizerDaemon.Init(ctx); err != nil {
+		log.Errorf("Failed to initialize authorizer daemon: %s", err.Error())
+		return nil, err
+	}
 
 	as.authorizerServer = &http.Server{
 		Addr:    idCfg.Authorizer.Addr,
@@ -166,11 +167,6 @@ func (as *authorizerService) Start(ctx context.Context) error {
 	go func() {
 		defer as.shutdownWg.Done()
 		log.Infof("Starting authorizer daemon: domains[%s]", as.idCfg.Authorizer.PolicyDomains)
-
-		if err := as.authorizerDaemon.Init(as.daemonCtx); err != nil {
-			log.Errorf("Failed to initialize authorizer daemon: %s", err.Error())
-			return
-		}
 
 		for err := range as.authorizerDaemon.Start(as.daemonCtx) {
 			if err == context.Canceled || strings.Contains(err.Error(), "context canceled") {
@@ -206,10 +202,6 @@ func (as *authorizerService) Shutdown() {
 	log.Info("Initiating shutdown of authorizer daemon ...")
 	close(as.shutdownChan)
 
-	if as.daemonCancel != nil {
-		as.daemonCancel()
-	}
-
 	if as.authorizerServer != nil {
 		if as.authorizerServerRunning {
 			log.Infof("Delaying authorizer server shutdown for %s to shutdown gracefully ...", "9s")
@@ -233,6 +225,10 @@ func (as *authorizerService) Shutdown() {
 				log.Errorf("Failed to shutdown authorizer server forcefully: %s", err.Error())
 			}
 		}
+	}
+
+	if as.daemonCancel != nil {
+		as.daemonCancel()
 	}
 
 	as.shutdownWg.Wait()
