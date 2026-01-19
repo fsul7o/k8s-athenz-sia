@@ -282,8 +282,14 @@ func (as *authorizerService) handleAuthorizerRequest(w http.ResponseWriter, r *h
 		}
 	}
 
+	// Get client certificate if mTLS
+	var clientCert *x509.Certificate
+	if r.TLS != nil && len(r.TLS.PeerCertificates) != 0 {
+		clientCert = r.TLS.PeerCertificates[0]
+	}
+
 	// Authorize
-	principal, err := as.authorize(cert, at, rt, action, resource)
+	principal, err := as.authorize(r.Context(), cert, at, rt, action, resource, clientCert)
 	if err != nil || principal == nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -306,12 +312,11 @@ func (as *authorizerService) handleAuthorizerRequest(w http.ResponseWriter, r *h
 	log.Debugf("successfully authorized request with Authorization len(%d), %s len(%d), X-Athenz-Certificate len(%d), action[%s], resource[%s]", len(at), as.idCfg.Authorizer.RoleAuthHeader, len(rt), len(certificatePEM), action, resource)
 }
 
-func (as *authorizerService) authorize(cert *x509.Certificate, at, rt, action, resource string) (authorizerd.Principal, error) {
-	ctx := context.Background()
+func (as *authorizerService) authorize(ctx context.Context, cert *x509.Certificate, at, rt, action, resource string, clientCert *x509.Certificate) (authorizerd.Principal, error) {
 	var principal authorizerd.Principal
 	var err error
 
-	// Try role certificate
+	// Try role certificate (not implemented)
 	if cert != nil && at == "" {
 		principal, err = as.authorizerDaemon.AuthorizeRoleCert(ctx, []*x509.Certificate{cert}, action, resource)
 		if err != nil {
@@ -325,7 +330,7 @@ func (as *authorizerService) authorize(cert *x509.Certificate, at, rt, action, r
 
 	// Try access token
 	if at != "" {
-		principal, err = as.authorizerDaemon.AuthorizeAccessToken(ctx, at, action, resource, cert)
+		principal, err = as.authorizerDaemon.AuthorizeAccessToken(ctx, at, action, resource, clientCert)
 		if err != nil {
 			err = fmt.Errorf("authorization failed with access token, action[%s], resource[%s]: %w", action, resource, err)
 			log.Debugf("Authorization failed: %s", err.Error())
