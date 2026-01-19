@@ -102,7 +102,6 @@ type IdentityConfig struct {
 	HealthCheckAddr     string
 	HealthCheckEndpoint string
 	DeleteInstanceID    bool
-	EnableReusePort     bool
 
 	LogDir   string
 	LogLevel string
@@ -128,7 +127,6 @@ type IdentityConfig struct {
 	rawPolicyRefreshInterval                 string
 	rawPublicKeyRefreshInterval              string
 	rawEnableMTLSCertificateBoundAccessToken string
-	rawEnableReusePort                       string
 }
 
 type DomainRole struct {
