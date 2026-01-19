@@ -44,6 +44,9 @@ type authorizerService struct {
 	authorizerServerRunning bool
 	authorizerDaemon        authorizerd.Authorizerd
 	httpClient              *http.Client
+
+	daemonCtx    context.Context
+	daemonCancel context.CancelFunc
 }
 
 func New(ctx context.Context, idCfg *config.IdentityConfig) (daemon.Daemon, error) {
@@ -156,20 +159,25 @@ func (as *authorizerService) Start(ctx context.Context) error {
 		return nil
 	}
 
+	as.daemonCtx, as.daemonCancel = context.WithCancel(context.Background())
+
 	// Start athenz-authorizer daemon
 	as.shutdownWg.Add(1)
 	go func() {
 		defer as.shutdownWg.Done()
 		log.Infof("Starting authorizer daemon: domains[%s]", as.idCfg.Authorizer.PolicyDomains)
 
-		authzCtx := context.Background()
-		if err := as.authorizerDaemon.Init(authzCtx); err != nil {
+		if err := as.authorizerDaemon.Init(as.daemonCtx); err != nil {
 			log.Errorf("Failed to initialize authorizer daemon: %s", err.Error())
 			return
 		}
 
-		for err := range as.authorizerDaemon.Start(authzCtx) {
-			log.Errorf("Authorizer daemon error: %s", err.Error())
+		for err := range as.authorizerDaemon.Start(as.daemonCtx) {
+			if err == context.Canceled || strings.Contains(err.Error(), "context canceled") {
+				log.Debugf("Authorizer daemon stopped: %s", err.Error())
+			} else {
+				log.Errorf("Authorizer daemon error: %s", err.Error())
+			}
 		}
 	}()
 
@@ -198,13 +206,32 @@ func (as *authorizerService) Shutdown() {
 	log.Info("Initiating shutdown of authorizer daemon ...")
 	close(as.shutdownChan)
 
-	if as.authorizerServer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	if as.daemonCancel != nil {
+		as.daemonCancel()
+	}
 
-		as.authorizerServer.SetKeepAlivesEnabled(false)
-		if err := as.authorizerServer.Shutdown(ctx); err != nil && err != context.Canceled {
-			log.Errorf("Failed to shutdown authorizer server: %s", err.Error())
+	if as.authorizerServer != nil {
+		if as.authorizerServerRunning {
+			log.Infof("Delaying authorizer server shutdown for %s to shutdown gracefully ...", "9s")
+			time.Sleep(9 * time.Second)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			as.authorizerServer.SetKeepAlivesEnabled(false)
+			if err := as.authorizerServer.Shutdown(ctx); err != nil {
+				// graceful shutdown error or timeout should be fatal
+				log.Errorf("Failed to shutdown authorizer server gracefully: %s", err.Error())
+			}
+		} else {
+			log.Info("Force shutdown authorizer server...")
+
+			forcedCtx, cancel := context.WithCancel(context.Background())
+			cancel() // force shutdown authorizer server without delay
+			as.authorizerServer.SetKeepAlivesEnabled(false)
+			if err := as.authorizerServer.Shutdown(forcedCtx); err != nil && err != context.Canceled {
+				// forceful shutdown error
+				log.Errorf("Failed to shutdown authorizer server forcefully: %s", err.Error())
+			}
 		}
 	}
 
