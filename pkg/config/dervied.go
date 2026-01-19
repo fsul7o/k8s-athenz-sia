@@ -60,5 +60,11 @@ func (idCfg *IdentityConfig) loadDerivedConfig() error {
 		return err
 	}
 
+	// depends on the following:
+	// - derivedTokenServerConfig() (for RoleAuthHeader)
+	if err := idCfg.derivedAuthorizerConfig(); err != nil {
+		return err
+	}
+
 	return nil
 }
