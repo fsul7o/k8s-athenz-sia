@@ -254,6 +254,7 @@ func (as *authorizerService) handleAuthorizerRequest(w http.ResponseWriter, r *h
 
 	rt := r.Header.Get(as.idCfg.Authorizer.RoleAuthHeader)
 
+	// rolecert authentication or bound access token
 	certificatePEM, _ := url.QueryUnescape(r.Header.Get("X-Athenz-Certificate"))
 
 	// Validate required headers
@@ -282,14 +283,8 @@ func (as *authorizerService) handleAuthorizerRequest(w http.ResponseWriter, r *h
 		}
 	}
 
-	// Get client certificate if mTLS
-	var clientCert *x509.Certificate
-	if r.TLS != nil && len(r.TLS.PeerCertificates) != 0 {
-		clientCert = r.TLS.PeerCertificates[0]
-	}
-
 	// Authorize
-	principal, err := as.authorize(r.Context(), cert, at, rt, action, resource, clientCert)
+	principal, err := as.authorize(r.Context(), cert, at, rt, action, resource)
 	if err != nil || principal == nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -312,7 +307,7 @@ func (as *authorizerService) handleAuthorizerRequest(w http.ResponseWriter, r *h
 	log.Debugf("successfully authorized request with Authorization len(%d), %s len(%d), X-Athenz-Certificate len(%d), action[%s], resource[%s]", len(at), as.idCfg.Authorizer.RoleAuthHeader, len(rt), len(certificatePEM), action, resource)
 }
 
-func (as *authorizerService) authorize(ctx context.Context, cert *x509.Certificate, at, rt, action, resource string, clientCert *x509.Certificate) (authorizerd.Principal, error) {
+func (as *authorizerService) authorize(ctx context.Context, cert *x509.Certificate, at, rt, action, resource string) (authorizerd.Principal, error) {
 	var principal authorizerd.Principal
 	var err error
 
@@ -330,7 +325,7 @@ func (as *authorizerService) authorize(ctx context.Context, cert *x509.Certifica
 
 	// Try access token
 	if at != "" {
-		principal, err = as.authorizerDaemon.AuthorizeAccessToken(ctx, at, action, resource, clientCert)
+		principal, err = as.authorizerDaemon.AuthorizeAccessToken(ctx, at, action, resource, cert)
 		if err != nil {
 			err = fmt.Errorf("authorization failed with access token, action[%s], resource[%s]: %w", action, resource, err)
 			log.Debugf("Authorization failed: %s", err.Error())
